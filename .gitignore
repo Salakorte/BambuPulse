@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+.verify-build*/
+.verify-widget*/
+publish/
+artifacts/
+
+# Per-user Bambu account, device, and preferences data
+settings.json
+preferences.json
+filament-library.json
+*.user
+*.suo
+*.cache
+
+# IDE and operating-system files
+.vs/
+.idea/
+.vscode/
+*.userosscache
+*.sln.docstates
+Thumbs.db
+Desktop.ini
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+secrets.*
+*.pfx
+*.p12
+*.key
+*.pem
+
