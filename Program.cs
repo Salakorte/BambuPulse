@@ -1,3 +1,4 @@
+Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
@@ -15,18 +16,20 @@ Application.Run(new MonitorWindow());
 
 sealed class MonitorWindow : Form
 {
+    readonly bool english = AppPreferences.Current.Language == "en";
     readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BambuP1SWidget", "settings.json");
     readonly Label status = new(), connection = new(), job = new(), jobSubtitle = new(), percent = new(), remaining = new(), updated = new(), inventorySummary = new(), layerInfo = new(), finishInfo = new();
-    readonly TemperatureGauge nozzleGauge = new(){Caption="Boquilla",Maximum=300,ColdThreshold=35,HotThreshold=165};
-    readonly TemperatureGauge bedGauge = new(){Caption="Cama",Maximum=120,ColdThreshold=24,HotThreshold=50};
+    readonly TemperatureGauge nozzleGauge = new(){Caption=AppPreferences.Current.Language == "en" ? "Nozzle" : "Boquilla",Maximum=300,ColdThreshold=35,HotThreshold=165};
+    readonly TemperatureGauge bedGauge = new(){Caption=AppPreferences.Current.Language == "en" ? "Bed" : "Cama",Maximum=120,ColdThreshold=24,HotThreshold=50};
     readonly SurfacePanel statePill=new();
     readonly List<FilamentCard> filamentCards = new();
     readonly ProgressTrack progress = new();
+    readonly PrinterSketch printerSketch = new();
     readonly Button settingsButton = new();
     readonly Button libraryButton = new();
     readonly Button closeButton = new();
     readonly NotifyIcon trayIcon = new();
-    readonly ToolStripMenuItem disableWidgetMenuItem = new("Desactivar modo widget");
+    readonly ToolStripMenuItem disableWidgetMenuItem = new(AppPreferences.Current.Language == "en" ? "Disable widget mode" : "Desactivar modo widget");
     readonly System.Windows.Forms.Timer positionSaveTimer = new(){Interval=600};
     readonly string libraryFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BambuP1SWidget", "filament-library.json");
     FilamentLibrary filamentLibrary = new();
@@ -42,7 +45,7 @@ sealed class MonitorWindow : Form
 
     public MonitorWindow()
     {
-        Text="Bambu Bar · P1S"; ClientSize=new Size(540,790); AutoScaleMode=AutoScaleMode.None;
+        Text=english ? "Bambu Bar · P1S" : "Bambu Bar · P1S"; Icon=LoadPrinterIcon(); ClientSize=new Size(540,790); AutoScaleMode=AutoScaleMode.None;
         FormBorderStyle=FormBorderStyle.None; MaximizeBox=false; DoubleBuffered=true; TopMost=false;
         BackColor=UiTheme.Background; ForeColor=UiTheme.Text; Font=new Font("Segoe UI",9);
         Region=new Region(SurfacePanel.RoundedPath(new Rectangle(0,0,Width-1,Height-1),16));
@@ -53,39 +56,40 @@ sealed class MonitorWindow : Form
         var eyebrow=MakeLabel("BAMBU LAB  ·  MONITOR",8,UiTheme.Muted,true);eyebrow.SetBounds(0,8,230,16);canvas.Controls.Add(eyebrow);
         var brand=MakeLabel("P1S",20,UiTheme.Text,true);brand.SetBounds(0,23,180,30);canvas.Controls.Add(brand);
         foreach(var dragTarget in new Control[]{eyebrow,brand})dragTarget.MouseDown+=(_,e)=>{if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
-        connection.Text="SIN CONEXIÓN";connection.Font=new Font("Segoe UI",8,FontStyle.Bold);connection.ForeColor=UiTheme.Muted;connection.TextAlign=ContentAlignment.MiddleCenter;connection.Dock=DockStyle.Fill;
+        connection.Text=english?"OFFLINE":"SIN CONEXIÓN";connection.Font=new Font("Segoe UI",8,FontStyle.Bold);connection.ForeColor=UiTheme.Muted;connection.TextAlign=ContentAlignment.MiddleCenter;connection.Dock=DockStyle.Fill;
         connectionPill.Bounds=new Rectangle(352,13,122,30);connectionPill.BackColor=UiTheme.Surface;connectionPill.BorderColor=UiTheme.Border;connectionPill.Radius=15;connectionPill.Controls.Add(connection);canvas.Controls.Add(connectionPill);
         closeButton.Text="×";closeButton.Font=new Font("Segoe UI",15);closeButton.SetBounds(477,14,27,28);UiTheme.StyleButton(closeButton,quiet:true);closeButton.ForeColor=UiTheme.Muted;closeButton.Region=new Region(SurfacePanel.RoundedPath(new Rectangle(0,0,26,27),8));closeButton.Click+=(_,_)=>Close();canvas.Controls.Add(closeButton);
 
         var hero=new SurfacePanel{Bounds=new Rectangle(0,68,504,210),BackColor=UiTheme.Surface,BorderColor=UiTheme.Border,Radius=18};canvas.Controls.Add(hero);
-        hero.Controls.Add(new PrinterSketch{Bounds=new Rectangle(14,26,132,164),BackColor=UiTheme.Surface});
+        printerSketch.Bounds=new Rectangle(14,26,132,164);printerSketch.BackColor=UiTheme.Surface;hero.Controls.Add(printerSketch);
         statePill.Bounds=new Rectangle(164,16,116,23);statePill.BackColor=UiTheme.PanelSuccess;statePill.BorderColor=UiTheme.BorderSuccess;statePill.Radius=11;
-        status.Text="SIN CONFIGURAR";status.Font=new Font("Segoe UI",7,FontStyle.Bold);status.ForeColor=UiTheme.Muted;status.TextAlign=ContentAlignment.MiddleCenter;status.Dock=DockStyle.Fill;statePill.Controls.Add(status);hero.Controls.Add(statePill);
-        job.Text="Esperando impresora";job.Font=UiTheme.Font(18,true);job.ForeColor=UiTheme.Text;job.AutoEllipsis=true;job.SetBounds(164,45,314,31);hero.Controls.Add(job);
+        status.Text=english?"NOT SET UP":"SIN CONFIGURAR";status.Font=new Font("Segoe UI",7,FontStyle.Bold);status.ForeColor=UiTheme.Muted;status.TextAlign=ContentAlignment.MiddleCenter;status.Dock=DockStyle.Fill;statePill.Controls.Add(status);hero.Controls.Add(statePill);
+        job.Text=english?"Waiting for printer":"Esperando impresora";job.Font=UiTheme.Font(18,true);job.ForeColor=UiTheme.Text;job.AutoEllipsis=true;job.SetBounds(164,45,314,31);hero.Controls.Add(job);
         jobSubtitle.Text="Bambu Cloud · P1S";jobSubtitle.Font=UiTheme.Font(8);jobSubtitle.ForeColor=UiTheme.TextSoft;jobSubtitle.AutoEllipsis=true;jobSubtitle.SetBounds(165,77,310,17);hero.Controls.Add(jobSubtitle);
         percent.Text="—%";percent.Font=new Font("Segoe UI Variable Display, Segoe UI",29,FontStyle.Bold);percent.ForeColor=UiTheme.Text;percent.SetBounds(160,96,138,44);hero.Controls.Add(percent);
-        layerInfo.Text="— / — capas";layerInfo.Font=UiTheme.Font(8,true);layerInfo.ForeColor=UiTheme.TextSoft;layerInfo.TextAlign=ContentAlignment.BottomRight;layerInfo.SetBounds(389,112,88,23);hero.Controls.Add(layerInfo);
+        layerInfo.Text=english?"— / — layers":"— / — capas";layerInfo.Font=UiTheme.Font(8,true);layerInfo.ForeColor=UiTheme.TextSoft;layerInfo.TextAlign=ContentAlignment.BottomRight;layerInfo.SetBounds(389,112,88,23);hero.Controls.Add(layerInfo);
         progress.BackColor=UiTheme.Border;progress.ProgressColor=UiTheme.Accent;progress.SetBounds(165,149,312,7);hero.Controls.Add(progress);
-        remaining.Text="— restantes";remaining.Font=UiTheme.Font(8,true);remaining.ForeColor=UiTheme.TextSoft;remaining.SetBounds(165,166,150,17);hero.Controls.Add(remaining);
-        finishInfo.Text="Fin · —";finishInfo.Font=UiTheme.Font(8);finishInfo.ForeColor=UiTheme.Muted;finishInfo.TextAlign=ContentAlignment.MiddleRight;finishInfo.SetBounds(325,166,152,17);hero.Controls.Add(finishInfo);
+        remaining.Text=english?"— remaining":"— restantes";remaining.Font=UiTheme.Font(8,true);remaining.ForeColor=UiTheme.TextSoft;remaining.SetBounds(165,166,150,17);hero.Controls.Add(remaining);
+        finishInfo.Text=english?"Finish · —":"Fin · —";finishInfo.Font=UiTheme.Font(8);finishInfo.ForeColor=UiTheme.Muted;finishInfo.TextAlign=ContentAlignment.MiddleRight;finishInfo.SetBounds(325,166,152,17);hero.Controls.Add(finishInfo);
 
-        var temperatureTitle=MakeLabel("TEMPERATURAS",8,UiTheme.Muted,true);temperatureTitle.SetBounds(0,294,250,18);canvas.Controls.Add(temperatureTitle);
+        var temperatureTitle=MakeLabel(english?"TEMPERATURES":"TEMPERATURAS",8,UiTheme.Muted,true);temperatureTitle.SetBounds(0,294,250,18);canvas.Controls.Add(temperatureTitle);
         var nozzleCard=new SurfacePanel{Bounds=new Rectangle(0,318,242,116),BackColor=UiTheme.Surface,BorderColor=UiTheme.Border,Radius=16};nozzleGauge.Dock=DockStyle.Fill;nozzleCard.Controls.Add(nozzleGauge);canvas.Controls.Add(nozzleCard);
         var bedCard=new SurfacePanel{Bounds=new Rectangle(262,318,242,116),BackColor=UiTheme.Surface,BorderColor=UiTheme.Border,Radius=16};bedGauge.Dock=DockStyle.Fill;bedCard.Controls.Add(bedGauge);canvas.Controls.Add(bedCard);
 
-        var filamentTitle=MakeLabel("AMS · BOBINAS",8,UiTheme.Muted,true);filamentTitle.SetBounds(0,451,160,18);canvas.Controls.Add(filamentTitle);
-        inventorySummary.Text="4 ranuras";inventorySummary.Font=new Font("Segoe UI",8);inventorySummary.ForeColor=UiTheme.Muted;inventorySummary.TextAlign=ContentAlignment.MiddleRight;inventorySummary.SetBounds(162,451,204,18);canvas.Controls.Add(inventorySummary);
-        libraryButton.Text="BIBLIOTECA";libraryButton.Font=new Font("Segoe UI",7,FontStyle.Bold);libraryButton.SetBounds(385,443,119,32);libraryButton.BackColor=UiTheme.SurfaceRaised;libraryButton.ForeColor=UiTheme.TextSoft;libraryButton.FlatStyle=FlatStyle.Flat;libraryButton.FlatAppearance.BorderColor=UiTheme.Border;UiTheme.StyleButton(libraryButton,quiet:true);libraryButton.Click+=(_,_)=>OpenFilamentLibrary();canvas.Controls.Add(libraryButton);
+        var filamentTitle=MakeLabel("AMS · SPOOL SLOTS",8,UiTheme.Muted,true);if(!english)filamentTitle.Text="AMS · BOBINAS";filamentTitle.SetBounds(0,451,160,18);canvas.Controls.Add(filamentTitle);
+        inventorySummary.Text=english?"4 slots":"4 ranuras";inventorySummary.Font=new Font("Segoe UI",8);inventorySummary.ForeColor=UiTheme.Muted;inventorySummary.TextAlign=ContentAlignment.MiddleRight;inventorySummary.SetBounds(162,451,204,18);canvas.Controls.Add(inventorySummary);
+        libraryButton.Text=english?"FILAMENTS":"BIBLIOTECA";libraryButton.Font=new Font("Segoe UI",7,FontStyle.Bold);libraryButton.SetBounds(385,443,119,32);libraryButton.BackColor=UiTheme.SurfaceRaised;libraryButton.ForeColor=UiTheme.TextSoft;libraryButton.FlatStyle=FlatStyle.Flat;libraryButton.FlatAppearance.BorderColor=UiTheme.Border;UiTheme.StyleButton(libraryButton,quiet:true);libraryButton.Click+=(_,_)=>OpenFilamentLibrary();canvas.Controls.Add(libraryButton);
         var filamentGrid=new SurfacePanel{Bounds=new Rectangle(0,489,504,126),BackColor=UiTheme.Surface,BorderColor=UiTheme.Border,Radius=16};canvas.Controls.Add(filamentGrid);
         for(var i=0;i<4;i++){var card=new FilamentCard(i+1){Bounds=new Rectangle(8+i*122,6,118,112)};filamentCards.Add(card);filamentGrid.Controls.Add(card);if(i<3)filamentGrid.Controls.Add(new Panel{Bounds=new Rectangle(128+i*122,20,1,82),BackColor=UiTheme.Border});}
 
-        updated.Text="Esperando conexión";updated.Font=new Font("Segoe UI",8);updated.ForeColor=UiTheme.Muted;updated.AutoEllipsis=true;updated.SetBounds(0,645,330,32);canvas.Controls.Add(updated);
-        settingsButton.Text="AJUSTES";settingsButton.Font=new Font("Segoe UI",8,FontStyle.Bold);settingsButton.SetBounds(385,638,119,34);settingsButton.BackColor=UiTheme.SurfaceRaised;settingsButton.ForeColor=UiTheme.TextSoft;settingsButton.FlatStyle=FlatStyle.Flat;settingsButton.FlatAppearance.BorderColor=UiTheme.Border;settingsButton.FlatAppearance.MouseOverBackColor=UiTheme.SurfaceHover;UiTheme.StyleButton(settingsButton);settingsButton.Click+=async(_,_)=>await OpenSettings();canvas.Controls.Add(settingsButton);
+        updated.Text=english?"Waiting for connection":"Esperando conexión";updated.Font=new Font("Segoe UI",8);updated.ForeColor=UiTheme.Muted;updated.AutoEllipsis=true;updated.SetBounds(0,645,330,32);canvas.Controls.Add(updated);
+        settingsButton.Text=english?"SETTINGS":"AJUSTES";settingsButton.Font=new Font("Segoe UI",8,FontStyle.Bold);settingsButton.SetBounds(385,638,119,34);settingsButton.BackColor=UiTheme.SurfaceRaised;settingsButton.ForeColor=UiTheme.TextSoft;settingsButton.FlatStyle=FlatStyle.Flat;settingsButton.FlatAppearance.BorderColor=UiTheme.Border;settingsButton.FlatAppearance.MouseOverBackColor=UiTheme.SurfaceHover;UiTheme.StyleButton(settingsButton);settingsButton.Click+=async(_,_)=>await OpenSettings();canvas.Controls.Add(settingsButton);
         RenderLibraryFilament();
         InitializeTrayMenu();
         positionSaveTimer.Tick+=(_,_)=>{positionSaveTimer.Stop();SaveDesktopLocation();};
         Move+=(_,_)=>{if(desktopWidget){positionSaveTimer.Stop();positionSaveTimer.Start();}};
         FormClosing+=(_,_)=>{positionSaveTimer.Stop();SaveDesktopLocation();trayIcon.Visible=false;trayIcon.Dispose();trayIconImage?.Dispose();};
+        UiLocalization.Apply(this);
         Shown+=async(_,_)=>{if(AppPreferences.Current.DesktopWidget)ApplyDesktopWidgetMode(true);await LoadConfig();};
     }
 
@@ -99,7 +103,7 @@ sealed class MonitorWindow : Form
     void InitializeTrayMenu()
     {
         var menu=new ContextMenuStrip{ShowImageMargin=false};
-        var settingsItem=new ToolStripMenuItem("Ajustes…");
+        var settingsItem=new ToolStripMenuItem(english?"Settings…":"Ajustes…");
         settingsItem.Click+=async(_,_)=>await OpenSettings();
         disableWidgetMenuItem.Enabled=desktopWidget;
         disableWidgetMenuItem.Click+=(_,_)=>
@@ -117,6 +121,10 @@ sealed class MonitorWindow : Form
 
     static Icon CreateTrayIcon()
     {
+        var iconPath=Path.Combine(AppContext.BaseDirectory,"Assets","bambu-printer.ico");
+        if(File.Exists(iconPath))return new Icon(iconPath);
+        using var appIcon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        if(appIcon is not null)return (Icon)appIcon.Clone();
         using var bitmap=new Bitmap(32,32);
         using(var graphics=Graphics.FromImage(bitmap))
         {
@@ -133,6 +141,14 @@ sealed class MonitorWindow : Form
         finally{DestroyIcon(handle);}
     }
 
+    static Icon LoadPrinterIcon()
+    {
+        var iconPath=Path.Combine(AppContext.BaseDirectory,"Assets","bambu-printer.ico");
+        return File.Exists(iconPath)
+            ? new Icon(iconPath)
+            : Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+    }
+
     void ApplyDesktopWidgetMode(bool enabled,Point? preferredLocation=null)
     {
         if(enabled)
@@ -142,7 +158,7 @@ sealed class MonitorWindow : Form
             else if(AppPreferences.Current.DesktopLeft.HasValue&&AppPreferences.Current.DesktopTop.HasValue)point=new Point(AppPreferences.Current.DesktopLeft.Value,AppPreferences.Current.DesktopTop.Value);
             else if(IsHandleCreated)point=Location;
             else point=new Point(Screen.PrimaryScreen!.WorkingArea.Right-ClientSize.Width-24,Screen.PrimaryScreen.WorkingArea.Top+80);
-            WindowState=FormWindowState.Normal;updated.Visible=false;settingsButton.Visible=false;ClientSize=new Size(540,647);SetCornerRegion(647);ShowInTaskbar=false;
+            WindowState=FormWindowState.Normal;updated.Visible=false;settingsButton.Visible=false;ClientSize=new Size(540,647);SetCornerRegion(647);ShowInTaskbar=true;
             point=ClampToWorkingArea(point,ClientSize);Location=point;
             // Keep this as a regular, non-topmost window. WorkerW parenting is undocumented
             // and can make WinForms windows disappear on current Windows builds.
@@ -211,6 +227,7 @@ sealed class MonitorWindow : Form
     async Task OpenSettings()
     {
         var wasDesktopWidget=desktopWidget;
+        var previousLanguage=AppPreferences.Current.Language;
         Point? widgetLocation=null;
         if(wasDesktopWidget&&desktopAttached){widgetLocation=DesktopWidgetHost.Detach(this);desktopAttached=false;lastDesktopLocation=widgetLocation;}
         using var dialog=new AppSettingsDialog(AppPreferences.Current.Theme,AppPreferences.Current.Language,connection.Text,desktopWidget);
@@ -218,7 +235,8 @@ sealed class MonitorWindow : Form
         if(result==DialogResult.Cancel){if(wasDesktopWidget)ApplyDesktopWidgetMode(true,widgetLocation);return;}
         try{AppPreferences.Save(dialog.SelectedTheme,dialog.SelectedLanguage,dialog.DesktopWidgetEnabled);}
         catch(Exception ex){if(wasDesktopWidget)ApplyDesktopWidgetMode(true,widgetLocation);MessageBox.Show(this,"No se pudieron guardar los ajustes.\n"+ex.Message,"Ajustes",MessageBoxButtons.OK,MessageBoxIcon.Error);return;}
-        if(!string.Equals(dialog.SelectedTheme,UiTheme.Mode,StringComparison.OrdinalIgnoreCase))
+        if(!string.Equals(dialog.SelectedTheme,UiTheme.Mode,StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(dialog.SelectedLanguage,previousLanguage,StringComparison.OrdinalIgnoreCase))
         {
             Application.Restart();Close();return;
         }
@@ -285,24 +303,25 @@ sealed class MonitorWindow : Form
         if(!string.IsNullOrWhiteSpace(rawState))
         {
             var normalized=rawState.ToLowerInvariant();
-            var display=normalized switch { "running" or "printing"=>"Imprimiendo", "idle"=>"En espera", "prepare"=>"Preparando", "finish" or "finished"=>"Finalizada", "failed"=>"Error de impresión", "pause" or "paused"=>"En pausa", _=>rawState };
+            printerSketch.IsPrinting=normalized is "running" or "printing";
+            var display=normalized switch { "running" or "printing"=>(english?"Printing":"Imprimiendo"), "idle"=>(english?"Idle":"En espera"), "prepare"=>(english?"Preparing":"Preparando"), "finish" or "finished"=>(english?"Finished":"Finalizada"), "failed"=>(english?"Print error":"Error de impresión"), "pause" or "paused"=>(english?"Paused":"En pausa"), _=>rawState };
             SetText(status,display.ToUpperInvariant());
             status.ForeColor=normalized switch { "running" or "printing" or "finish" or "finished"=>UiTheme.Success, "failed"=>UiTheme.Error, "pause" or "paused"=>UiTheme.Warning, "prepare"=>UiTheme.Cool, _=>UiTheme.Muted };
             statePill.BackColor=normalized switch { "running" or "printing" or "finish" or "finished"=>UiTheme.PanelSuccess, "failed"=>UiTheme.PanelError, "pause" or "paused"=>UiTheme.PanelWarning, "prepare"=>UiTheme.PanelInfo, _=>UiTheme.SurfaceRaised };
             statePill.BorderColor=normalized switch { "running" or "printing" or "finish" or "finished"=>UiTheme.BorderSuccess, "failed"=>UiTheme.BorderError, "pause" or "paused"=>UiTheme.BorderWarning, "prepare"=>UiTheme.BorderInfo, _=>UiTheme.Border };statePill.Invalidate();
-            if(normalized=="idle") { isIdle=true; SetText(job,"Sin impresión activa"); SetText(percent,"—%"); progress.Value=0; SetText(remaining,"— restantes"); SetText(layerInfo,"— / — capas"); SetText(finishInfo,"Fin estimado · —"); }
+            if(normalized=="idle") { isIdle=true; SetText(job,english?"No active print":"Sin impresión activa"); SetText(percent,"—%"); progress.Value=0; SetText(remaining,english?"— remaining":"— restantes"); SetText(layerInfo,english?"— / — layers":"— / — capas"); SetText(finishInfo,english?"Estimated finish · —":"Fin estimado · —"); }
         }
         var name=Str(p,"gcode_file","subtask_name","task_name"); if(!isIdle&&!string.IsNullOrWhiteSpace(name)) SetText(job,Path.GetFileNameWithoutExtension(name));
         var pc=Num(p,"mc_percent","percent","progress"); if(pc.HasValue&&!isIdle){SetText(percent,$"{pc:0}%");progress.Value=(int)Math.Clamp(pc.Value,0,100);}
         var layer=Num(p,"layer_num"); var totalLayers=Num(p,"total_layer_num");
-        if(!isIdle&&(layer.HasValue||totalLayers.HasValue))SetText(layerInfo,$"{(layer.HasValue?layer.Value.ToString("0"):"—")} / {(totalLayers.HasValue?totalLayers.Value.ToString("0"):"—")} capas");
-        var min=Num(p,"mc_remaining_time","remaining_time"); if(min.HasValue&&!isIdle){SetText(remaining,FormatRemaining(min.Value)+" restantes");SetText(finishInfo,"Fin estimado · "+DateTime.Now.AddMinutes(Math.Max(0,min.Value)).ToString("HH:mm"));}
+        if(!isIdle&&(layer.HasValue||totalLayers.HasValue))SetText(layerInfo,$"{(layer.HasValue?layer.Value.ToString("0"):"—")} / {(totalLayers.HasValue?totalLayers.Value.ToString("0"):"—")} {(english?"layers":"capas")}");
+        var min=Num(p,"mc_remaining_time","remaining_time"); if(min.HasValue&&!isIdle){SetText(remaining,FormatRemaining(min.Value)+(english?" remaining":" restantes"));SetText(finishInfo,(english?"Estimated finish · ":"Fin estimado · ")+DateTime.Now.AddMinutes(Math.Max(0,min.Value)).ToString("HH:mm"));}
         nozzleGauge.TargetTemperature=Num(p,"nozzle_target_temper","nozzle_target_temp");
         bedGauge.TargetTemperature=Num(p,"bed_target_temper","bed_target_temp");
         UpdateTemperature(nozzleGauge,Num(p,"nozzle_temper","nozzle_temp"),300,ref nozzleZeroSince,ref nozzleZeroCount);
         UpdateTemperature(bedGauge,Num(p,"bed_temper","bed_temp"),120,ref bedZeroSince,ref bedZeroCount);
         UpdateFilament(p);
-        SetText(updated,"Actualizado · "+DateTime.Now.ToString("HH:mm"));
+        SetText(updated,(english?"Updated · ":"Actualizado · ")+DateTime.Now.ToString("HH:mm"));
     }
     static void UpdateTemperature(TemperatureGauge gauge,double? reading,double max,ref DateTime? zeroSince,ref int zeroCount)
     {
@@ -326,7 +345,7 @@ sealed class MonitorWindow : Form
         if(detail==null)return new();using(detail){var mapping=Find(detail.RootElement,"amsDetailMapping");if(mapping.ValueKind!=JsonValueKind.Array)return new();var result=new List<(int,double)>();foreach(var item in mapping.EnumerateArray()){var grams=Num(item,"weight","used_g","filament_used_g");var slotId=(int?)Num(item,"slotId","slot_id");var amsId=(int?)Num(item,"amsId","ams_id");if(!grams.HasValue||grams<=0||!slotId.HasValue)continue;result.Add((amsId.HasValue?amsId.Value*4+slotId.Value+1:slotId.Value+1,grams.Value));}return result;}
     }
     static string FormatRemaining(double minutes){var total=Math.Max(0,(int)Math.Round(minutes));return total>=60?$"{total/60} h {total%60:00} min":$"{total} min";}
-    static void SetText(Label label,string text){if(!string.Equals(label.Text,text,StringComparison.Ordinal))label.Text=text;}
+    static void SetText(Label label,string text){text=UiLocalization.T(text);if(!string.Equals(label.Text,text,StringComparison.Ordinal))label.Text=text;}
     static JsonElement Find(JsonElement e,string key)
     {
         if(e.ValueKind==JsonValueKind.Object){if(e.TryGetProperty(key,out var v))return v;foreach(var x in e.EnumerateObject()){var n=Find(x.Value,key);if(n.ValueKind!=JsonValueKind.Undefined)return n;}}
@@ -338,8 +357,28 @@ sealed class MonitorWindow : Form
 
 sealed class PrinterSketch:Control
 {
- public PrinterSketch(){DoubleBuffered=true;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
- protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;var frame=UiTheme.Muted;var faint=UiTheme.Border;using var pen=new Pen(frame,2);using var thin=new Pen(faint,1);using var glass=new SolidBrush(UiTheme.SurfaceRaised);using var light=new SolidBrush(UiTheme.Accent);var body=new Rectangle(20,12,94,128);using var bodyPath=SurfacePanel.RoundedPath(body,13);g.FillPath(glass,bodyPath);g.DrawPath(pen,bodyPath);g.DrawLine(thin,25,39,109,39);g.DrawLine(thin,25,115,109,115);g.DrawLine(pen,32,39,32,112);g.DrawLine(pen,102,39,102,112);g.DrawLine(thin,34,101,100,101);g.DrawLine(pen,39,45,96,45);g.DrawLine(thin,68,45,68,62);g.DrawLine(pen,62,59,74,59);g.DrawLine(thin,68,65,68,83);g.DrawLine(pen,46,100,90,100);g.DrawLine(thin,55,99,68,87);g.DrawLine(thin,68,87,81,99);g.FillEllipse(light,102,19,5,5);using var caption=new Font("Segoe UI",7,FontStyle.Bold);using var brush=new SolidBrush(UiTheme.Muted);var label="COREXY  ·  P1S";var size=g.MeasureString(label,caption);g.DrawString(label,caption,brush,(Width-size.Width)/2,151);}
+ readonly System.Windows.Forms.Timer animationTimer=new(){Interval=38};
+ float nozzleX=39;int direction=1,layer=0;bool isPrinting;
+ public bool IsPrinting
+ {
+  get=>isPrinting;
+  set{if(isPrinting==value)return;isPrinting=value;if(value)animationTimer.Start();else animationTimer.Stop();Invalidate();}
+ }
+ public PrinterSketch(){DoubleBuffered=true;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);animationTimer.Tick+=(_,_)=>{nozzleX+=direction*1.6f;if(nozzleX>=94){nozzleX=94;direction=-1;layer=Math.Min(10,layer+1);}else if(nozzleX<=40){nozzleX=40;direction=1;layer=Math.Min(10,layer+1);}Invalidate();};}
+ protected override void Dispose(bool disposing){if(disposing)animationTimer.Dispose();base.Dispose(disposing);}
+ protected override void OnPaint(PaintEventArgs e)
+ {
+  base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;var frame=UiTheme.Muted;var faint=UiTheme.Border;
+  using var pen=new Pen(frame,2);using var thin=new Pen(faint,1);using var glass=new SolidBrush(UiTheme.SurfaceRaised);using var light=new SolidBrush(UiTheme.Accent);
+  var body=new Rectangle(20,12,94,128);using var bodyPath=SurfacePanel.RoundedPath(body,13);g.FillPath(glass,bodyPath);g.DrawPath(pen,bodyPath);
+  g.DrawLine(thin,25,39,109,39);g.DrawLine(thin,25,115,109,115);g.DrawLine(pen,32,39,32,112);g.DrawLine(pen,102,39,102,112);g.DrawLine(thin,34,101,100,101);
+  g.DrawLine(pen,39,45,96,45);var headX=isPrinting?nozzleX:68;var headY=isPrinting?Math.Max(65,82-layer):59;
+  using var head=new SolidBrush(isPrinting?UiTheme.Accent:UiTheme.Muted);using var headPath=SurfacePanel.RoundedPath(new Rectangle((int)headX-6,headY-2,12,7),3);g.FillPath(head,headPath);
+  using var filamentPen=new Pen(isPrinting?UiTheme.Accent:UiTheme.Border,1.5f);g.DrawLine(filamentPen,headX,headY+5,headX,headY+10);
+  if(isPrinting){using var bead=new SolidBrush(Color.FromArgb(180,UiTheme.Accent));g.FillEllipse(bead,headX-2,headY+10,4,2);}
+  g.DrawLine(pen,39,101,96,101);g.DrawLine(thin,52,100,68,88);g.DrawLine(thin,68,88,84,100);g.FillEllipse(light,102,19,5,5);
+  using var caption=new Font("Segoe UI",7,FontStyle.Bold);using var brush=new SolidBrush(UiTheme.Muted);var label="COREXY  ·  P1S";var size=g.MeasureString(label,caption);g.DrawString(label,caption,brush,(Width-size.Width)/2,151);
+ }
 }
 class SurfacePanel : Panel
 {
