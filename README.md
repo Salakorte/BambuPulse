@@ -4,6 +4,8 @@
 **Español | English**
 
 ---
+<img width="526" height="638" alt="image" src="https://github.com/user-attachments/assets/ce148e89-0044-434d-a7b9-d893353a471c" />
+
 
 ## Español
 
