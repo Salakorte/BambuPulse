@@ -1,4 +1,3 @@
-Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 using System.Drawing;
 
 sealed class AppSettingsDialog : Form
@@ -121,4 +120,3 @@ sealed class AppSettingsDialog : Form
         widgetButton.FlatAppearance.MouseOverBackColor=desktopWidget?UiTheme.AccentHover:UiTheme.SurfaceHover;
     }
 }
-

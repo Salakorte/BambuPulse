@@ -45,4 +45,3 @@ static class UiTheme
  public static void StyleButton(Button button,bool primary=false,bool quiet=false){button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderSize=0;button.FlatAppearance.MouseOverBackColor=primary?AccentHover:SurfaceHover;button.FlatAppearance.MouseDownBackColor=primary?Color.FromArgb(166,199,121):Color.FromArgb(54,68,56);button.BackColor=primary?Accent:quiet?Background:SurfaceRaised;button.ForeColor=primary?AccentInk:TextSoft;button.Font=Font(9,true);button.Cursor=Cursors.Hand;button.UseVisualStyleBackColor=false;button.FlatAppearance.BorderColor=button.BackColor;}
 }
 
-

@@ -1,4 +1,3 @@
-Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -101,7 +100,6 @@ static class SpoolArt
   var center=new Rectangle(x+size/3,y+size/3,size/3,size/3);using var hole=new SolidBrush(centerBackground);using var holeBorder=new Pen(ControlPaint.Dark(color,.5f),Math.Max(1,size*.04f));g.FillEllipse(hole,center);g.DrawEllipse(holeBorder,center);
  }
 }
-
 
 
 

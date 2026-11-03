@@ -31,4 +31,3 @@ sealed class AppPreferences
         File.WriteAllText(FilePath, JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
-

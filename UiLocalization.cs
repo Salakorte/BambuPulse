@@ -1,4 +1,3 @@
-Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 using System.Windows.Forms;
 
 static class UiLocalization
@@ -63,4 +62,3 @@ static class UiLocalization
         }
     }
 }
-

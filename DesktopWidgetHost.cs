@@ -96,4 +96,3 @@ static class DesktopWidgetHost
         return host != IntPtr.Zero ? host : progman;
     }
 }
-

@@ -1,4 +1,3 @@
-Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
@@ -614,7 +613,6 @@ sealed class ConfigDialog : Form
     void AddLabel(string text,int x,int y)=>Controls.Add(new Label{Text=text,ForeColor=UiTheme.TextSoft,Font=new Font("Segoe UI",8,FontStyle.Bold),Bounds=new Rectangle(x,y,350,22)});
     sealed record PrinterChoice(string Id,string Label){public override string ToString()=>Label;}
 }
-
 
 
 
