@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\bambu-printer.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
@@ -12,4 +13,10 @@
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
+  <Target Name="BuildCameraCloudBridge" BeforeTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\tools\build-camera-bridge.ps1&quot; -OutputPath &quot;$(TargetDir)CameraCloudBridge.dll&quot;" />
+  </Target>
+  <Target Name="CopyCameraCloudBridgeToPublish" AfterTargets="Publish" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\tools\build-camera-bridge.ps1&quot; -OutputPath &quot;$(PublishDir)CameraCloudBridge.dll&quot;" />
+  </Target>
 </Project>

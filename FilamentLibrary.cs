@@ -2,8 +2,8 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 sealed class FilamentLibrary { public List<Spool> Spools {get;set;}=new(); public string?[] Slots {get;set;}=new string?[4]; public List<PrintEntry> History {get;set;}=new(); }
-sealed class Spool { public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Name {get;set;}=""; public string Material {get;set;}="PLA"; public string Brand {get;set;}=""; public string Hex {get;set;}="B2DA6F"; public double Capacity {get;set;}=1000; public double Remaining {get;set;}=1000; }
-sealed class PrintEntry { public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Job {get;set;}="Print"; public DateTime Date {get;set;}=DateTime.Now; public bool Pending {get;set;}=true; public List<PrintSlice> Slices {get;set;}=new(); }
+sealed class Spool { public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Name {get;set;}=""; public string Material {get;set;}="PLA"; public string Brand {get;set;}=""; public string Hex {get;set;}="B2DA6F"; public double Capacity {get;set;}=1000; public double Remaining {get;set;}=1000; public string? RfidTagUid {get;set;} public string? RfidTrayUuid {get;set;} public string? RfidProfileId {get;set;} }
+sealed class PrintEntry { public string Id {get;set;}=Guid.NewGuid().ToString("N"); public string Job {get;set;}="Print"; public DateTime Date {get;set;}=DateTime.Now; public string? TaskId {get;set;} public bool Pending {get;set;}=true; public List<PrintSlice> Slices {get;set;}=new(); public string?[] SlotSpoolIds {get;set;}=new string?[4]; }
 sealed class PrintSlice { public int Slot {get;set;} public string? SpoolId {get;set;} public double Grams {get;set;} public string Source {get;set;}="Manual"; }
 sealed class FilamentManager:Form
 {
@@ -58,23 +58,52 @@ sealed class FilamentManager:Form
 }
 sealed class SpoolDropdown:Control
 {
- readonly List<Spool> spools=new(); string? selectedId; bool hovered;
+ readonly List<Spool> spools=new(); readonly ContextMenuStrip pickerMenu; string? selectedId; bool hovered;
  public event Action<object?,string?>? SelectionChanged;
- public SpoolDropdown(){DoubleBuffered=true;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);Cursor=Cursors.Hand;Font=new Font("Segoe UI",9);MouseEnter+=(_,_)=>{hovered=true;Invalidate();};MouseLeave+=(_,_)=>{hovered=false;Invalidate();};Click+=(_,_)=>OpenPicker();}
+ public SpoolDropdown(){DoubleBuffered=true;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);Cursor=Cursors.Hand;Font=new Font("Segoe UI",9);pickerMenu=new ContextMenuStrip{ShowImageMargin=false,ShowCheckMargin=false,BackColor=UiTheme.Surface,ForeColor=UiTheme.TextSoft,Padding=new Padding(4),Renderer=new ToolStripProfessionalRenderer(new SpoolPickerColorTable())};MouseEnter+=(_,_)=>{hovered=true;Invalidate();};MouseLeave+=(_,_)=>{hovered=false;Invalidate();};Click+=(_,_)=>OpenPicker();}
  public void SetSpools(IEnumerable<Spool> values,string? selected){spools.Clear();spools.AddRange(values);selectedId=selected;Invalidate();}
  protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;var bounds=new Rectangle(1,1,Width-3,Height-3);using var path=SurfacePanel.RoundedPath(bounds,9);using var fill=new SolidBrush(hovered?UiTheme.SurfaceHover:UiTheme.SurfaceRaised);using var pen=new Pen(UiTheme.Border,1);g.FillPath(fill,path);g.DrawPath(pen,path);var spool=spools.FirstOrDefault(x=>x.Id==selectedId);string label=spool==null?"Sin asignar":$"{spool.Name}   ·   {spool.Material}   ·   {spool.Remaining:0} g";if(spool!=null)SpoolArt.Draw(g,SpoolVisualCard.ColorForHex(spool.Hex),new Rectangle(12,8,22,22),UiTheme.SurfaceRaised);using var brush=new SolidBrush(spool==null?UiTheme.Muted:UiTheme.Text);using var fmt=new StringFormat{LineAlignment=StringAlignment.Center,Trimming=StringTrimming.EllipsisCharacter};g.DrawString(label,Font,brush,new RectangleF(spool==null?14:44,0,Width-76,Height),fmt);using var arrow=new SolidBrush(UiTheme.Muted);var cx=Width-22;var cy=Height/2;Point[] triangle={new(cx-4,cy-2),new(cx+4,cy-2),new(cx,cy+3)};g.FillPolygon(arrow,triangle);}
- void OpenPicker(){using var popup=new SpoolPickerPopup(spools,selectedId,id=>{selectedId=id;Invalidate();SelectionChanged?.Invoke(this,id);});var p=PointToScreen(new Point(0,Height+4));popup.Location=p;popup.Width=Width;popup.ShowDialog(FindForm());}
-}
-sealed class SpoolPickerPopup:Form
-{
- public SpoolPickerPopup(IReadOnlyList<Spool> spools,string? selected,Action<string?> choose){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;StartPosition=FormStartPosition.Manual;BackColor=UiTheme.Surface;Padding=new Padding(1);var height=Math.Min(264,Math.Max(48,(spools.Count+1)*44+8));ClientSize=new Size(320,height);Region=new Region(SurfacePanel.RoundedPath(new Rectangle(1,1,Width-3,Height-3),11));var host=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=spools.Count>5,BackColor=UiTheme.Surface,Padding=new Padding(5)};Controls.Add(host);AddOption(host,"Sin asignar",null,selected==null,Color.Transparent,choose);foreach(var spool in spools)AddOption(host,$"{spool.Name}   ·   {spool.Material}   ·   {spool.Remaining:0} g",spool.Id,spool.Id==selected,SpoolVisualCard.ColorForHex(spool.Hex),choose);}
- static void AddOption(FlowLayoutPanel host,string text,string? id,bool selected,Color color,Action<string?> choose){var item=new SpoolPickerOption(text,color,selected){Width=host.ClientSize.Width-18,Height=38,Margin=new Padding(0,1,0,1),Anchor=AnchorStyles.Left|AnchorStyles.Right};item.Click+=(_,_)=>{choose(id);host.FindForm()?.Close();};host.Controls.Add(item);}
-}
-sealed class SpoolPickerOption:Control
-{
- readonly Color color;readonly bool selected;bool hover;
- public SpoolPickerOption(string text,Color tint,bool active){Text=text;color=tint;selected=active;DoubleBuffered=true;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);Cursor=Cursors.Hand;MouseEnter+=(_,_)=>{hover=true;Invalidate();};MouseLeave+=(_,_)=>{hover=false;Invalidate();};}
- protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;var r=new Rectangle(0,0,Width-1,Height-1);using var p=SurfacePanel.RoundedPath(r,8);using var b=new SolidBrush(selected?UiTheme.SurfaceHover:hover?UiTheme.SurfaceRaised:UiTheme.Surface);g.FillPath(b,p);if(color!=Color.Transparent)SpoolArt.Draw(g,color,new Rectangle(8,7,22,22),UiTheme.Surface);using var textBrush=new SolidBrush(selected?UiTheme.Text:UiTheme.TextSoft);using var fmt=new StringFormat{LineAlignment=StringAlignment.Center,Trimming=StringTrimming.EllipsisCharacter};g.DrawString(Text,Font,textBrush,new RectangleF(color==Color.Transparent?12:40,0,Width-50,Height),fmt);if(selected){using var mark=new SolidBrush(UiTheme.Accent);g.FillEllipse(mark,Width-22,Height/2-3,6,6);}}
+ void OpenPicker()
+ {
+  pickerMenu.Items.Clear();
+  AddPickerOption("Sin asignar",null,selectedId==null);
+  foreach(var spool in spools)
+   AddPickerOption($"{spool.Name}   ·   {spool.Material}   ·   {spool.Remaining:0} g",spool.Id,spool.Id==selectedId);
+  pickerMenu.Show(this,new Point(0,Height+4));
+ }
+ void AddPickerOption(string label,string? id,bool selected)
+ {
+  var item=new ToolStripMenuItem((selected?"✓  ":"")+label)
+  {
+   AutoSize=false,
+   Width=Math.Max(240,Width-12),
+   Height=36,
+   BackColor=selected?UiTheme.PanelInfo:UiTheme.Surface,
+   ForeColor=selected?UiTheme.Accent:UiTheme.TextSoft,
+   Font=UiTheme.Font(8,true),
+   Padding=new Padding(10,4,8,4)
+  };
+  item.Click+=(_,_) =>
+  {
+   selectedId=id;
+   Invalidate();
+   SelectionChanged?.Invoke(this,id);
+   pickerMenu.Close();
+  };
+  pickerMenu.Items.Add(item);
+ }
+ sealed class SpoolPickerColorTable : ProfessionalColorTable
+ {
+  public override Color ToolStripDropDownBackground=>UiTheme.Surface;
+  public override Color MenuBorder=>UiTheme.Border;
+  public override Color MenuItemSelected=>UiTheme.SurfaceHover;
+  public override Color MenuItemSelectedGradientBegin=>UiTheme.SurfaceHover;
+  public override Color MenuItemSelectedGradientEnd=>UiTheme.SurfaceHover;
+  public override Color MenuItemBorder=>UiTheme.Border;
+  public override Color ImageMarginGradientBegin=>UiTheme.Surface;
+  public override Color ImageMarginGradientMiddle=>UiTheme.Surface;
+  public override Color ImageMarginGradientEnd=>UiTheme.Surface;
+ }
 }
 sealed class SpoolVisualCard:Control
 {
@@ -97,14 +126,22 @@ static class SpoolArt
   var size=Math.Min(rect.Width,rect.Height);var x=rect.X+(rect.Width-size)/2;var y=rect.Y+(rect.Height-size)/2;var face=new Rectangle(x,y,size-1,size-1);var inset=Math.Max(2,size/9);
   using var fill=new SolidBrush(color);using var rim=new Pen(ControlPaint.Dark(color,.38f),Math.Max(1,size*.06f));using var rings=new Pen(ControlPaint.Light(color,.48f),Math.Max(1,size*.045f));
   g.FillEllipse(fill,face);g.DrawEllipse(rim,face);g.DrawEllipse(rings,Rectangle.Inflate(face,-inset,-inset));g.DrawEllipse(rim,Rectangle.Inflate(face,-inset*2,-inset*2));
-  var center=new Rectangle(x+size/3,y+size/3,size/3,size/3);using var hole=new SolidBrush(centerBackground);using var holeBorder=new Pen(ControlPaint.Dark(color,.5f),Math.Max(1,size*.04f));g.FillEllipse(hole,center);g.DrawEllipse(holeBorder,center);
+  var center=new Rectangle(x+size/3,y+size/3,size/3,size/3);
+  using var spokePen=new Pen(ControlPaint.Dark(color,.2f),Math.Max(1,size*.035f));
+  var cx=x+size/2f;var cy=y+size/2f;var inner=size*.24f;var outer=size*.38f;
+  for(var i=0;i<8;i++)
+  {
+   var angle=(float)(Math.PI*i/4);
+   g.DrawLine(spokePen,cx+MathF.Cos(angle)*inner,cy+MathF.Sin(angle)*inner,
+    cx+MathF.Cos(angle)*outer,cy+MathF.Sin(angle)*outer);
+  }
+  var coreInset=Math.Max(1,size/24);
+  var core=Rectangle.Inflate(center,-coreInset,-coreInset);
+  using var hub=new SolidBrush(ControlPaint.Light(color,.15f));
+  using var hole=new SolidBrush(centerBackground);
+  using var holeBorder=new Pen(ControlPaint.Dark(color,.5f),Math.Max(1,size*.04f));
+  g.FillEllipse(hub,center);g.FillEllipse(hole,core);g.DrawEllipse(holeBorder,center);
  }
 }
-
-
-
-
-
-
 
 
