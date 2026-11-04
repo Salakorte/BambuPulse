@@ -1,5 +1,5 @@
 
-# BambuLab Status Widget
+# BambuPulse
 
 **Español | English**
 
